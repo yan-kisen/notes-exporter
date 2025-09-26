@@ -478,30 +478,45 @@ on createDirectory(directoryPath)
 	do shell script "mkdir -p " & quoted form of directoryPath
 end createDirectory
 
--- Subroutine to write content to a file
+-- Subroutine to write content to a file with UTF-8 encoding
 on writeToFile(filePath, content)
-	try
-		-- Convert the file path to a file object
-		set fileObject to POSIX file filePath
-		-- Try to open the file for access
-		set fileDescriptor to open for access fileObject with write permission
-		write content to fileDescriptor starting at eof
-		close access fileDescriptor
-	on error errMsg
-		-- Log the error message
-		log "Error writing to file: " & errMsg
-
-		-- If the file does not exist, create it and then open for access
-		close access
-		do shell script "touch " & quoted form of filePath
-		set fileDescriptor to open for access fileObject with write permission
-		write content to fileDescriptor starting at eof
-		close access fileDescriptor
-	end try
+    log "[writeToFile: ]" & filePath
+    try
+        -- Create a temporary file for the content
+        set tempFile to do shell script "mktemp"
+        -- Write content to temp file using a here document with unique delimiter
+        set delimiter to "UNIQUE_DELIMITER_" & (random number from 100000 to 999999)
+        do shell script "cat > " & quoted form of tempFile & " << '" & delimiter & "'
+" & content & "
+" & delimiter
+        -- Use Python to read from temp file and write to final file with UTF-8 encoding
+        set pythonCommand to "python3 -c \"
+import sys
+tempFile = sys.argv[1]
+filePath = sys.argv[2]
+with open(tempFile, 'r', encoding='utf-8') as f:
+    content = f.read()
+with open(filePath, 'w', encoding='utf-8') as f:
+    f.write(content)
+\" " & quoted form of tempFile & " " & quoted form of filePath
+        do shell script pythonCommand
+        -- Clean up temp file
+        do shell script "rm " & quoted form of tempFile
+    on error errMsg
+        -- Log the error message
+        log "Error writing to file: " & errMsg
+        -- Try to clean up temp file if it exists
+        try
+            do shell script "rm -f " & quoted form of tempFile
+        end try
+        -- Fallback: create empty file
+        do shell script "touch " & quoted form of filePath
+    end try
 end writeToFile
 
 -- Subroutine to generate a valid filename, replace certain characters with dashes, remove non-alphanumeric characters (except dashes), and consolidate multiple dashes
-on makeValidFilename(filename)
+on makeValidFilenameOld(filename)
+	log "[makeValidmakeValidFilenameOldFilename | original:] " & fileName
 	-- Replace only the genuinely problematic characters with dashes
 	set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
 	repeat with aChar in charactersToReplace
@@ -528,12 +543,62 @@ on makeValidFilename(filename)
 		set filename to text 1 through -2 of filename
 	end repeat
 
+	-- Remove emojis and other non-ASCII characters for Obsidian compatibility
+	set filename to do shell script "echo " & quoted form of filename & " | iconv -c -t ascii 2>/dev/null"
+
 	-- Ensure filename isn't empty
 	if filename is "" or filename is "-" then
 		set filename to "untitled"
 	end if
 
+	log "[makeValidFilenameOld | updated:] " & fileName
 	return filename
+end makeValidFilenameOld
+
+on makeValidFilename(fileName)
+    log "[makeValidFilename | original:] " & fileName
+    -- Replace only the genuinely problematic characters with dashes
+    set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
+    repeat with aChar in charactersToReplace
+        set AppleScript's text item delimiters to aChar
+        set fileName to text items of fileName
+        set AppleScript's text item delimiters to "-"
+        set fileName to fileName as string
+    end repeat
+
+    -- NEW: Remove non-ASCII characters (including emojis)
+    try
+        set pythonCommand to "python3 -c \"import sys; import re; print(re.sub(r'[^\\x00-\\x7F]', '', sys.argv[1]))\" " & quoted form of fileName
+        set fileName to do shell script pythonCommand
+    on error errMsg
+        log "Error removing non-ASCII characters: " & errMsg
+        -- Fallback: Keep original sanitization if Python fails
+    end try
+
+    -- Consolidate multiple dashes
+    repeat while fileName contains "--"
+        set AppleScript's text item delimiters to "--"
+        set textItems to text items of fileName
+        set AppleScript's text item delimiters to "-"
+        set fileName to textItems as string
+    end repeat
+
+    -- Remove leading/trailing dashes
+    repeat while fileName starts with "-" and length of fileName > 1
+        set fileName to text 2 through -1 of fileName
+    end repeat
+
+    repeat while fileName ends with "-" and length of fileName > 1
+        set fileName to text 1 through -2 of fileName
+    end repeat
+
+    -- Ensure filename isn't empty
+    if fileName is "" or fileName is "-" then
+        set fileName to "untitled"
+    end if
+
+		log "[makeValidFilename | updated:] " & fileName
+    return fileName
 end makeValidFilename
 
 -- Subroutine to generate a filename based on the specified format
