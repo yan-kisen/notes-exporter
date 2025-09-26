@@ -108,31 +108,28 @@ on run argv
 		set filteredAccounts to {}
 		repeat with anAccount in theAccounts
 			set originalAccountName to name of anAccount
-			set accountName to my makeValidFilename(originalAccountName)
+--			set accountName to my makeValidFilename(originalAccountName)
 			set shouldProcessAccount to false
 			if (count of includeAccounts) > 0 then
-repeat with includeItem in includeAccounts
-		log "comparing includeItem | [" & includeItem & "] vs [" & originalAccountName & "]"
-		set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
-		set lowerInclude to do shell script "echo " & quoted form of includeItem & " | tr '[:upper:]' '[:lower:]'"
-		if lowerOriginal = lowerInclude then
-			   log "setting shouldProcessAccount"
-			   set shouldProcessAccount to true
-			   exit repeat
-		end if
-end repeat
+				repeat with includeItem in includeAccounts
+						set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
+						set lowerInclude to do shell script "echo " & quoted form of includeItem & " | tr '[:upper:]' '[:lower:]'"
+						if lowerOriginal = lowerInclude then
+								 set shouldProcessAccount to true
+								 exit repeat
+						end if
+				end repeat
 			else
-set shouldProcessAccount to true
-repeat with excludeItem in excludeAccounts
-		set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
-		set lowerExclude to do shell script "echo " & quoted form of excludeItem & " | tr '[:upper:]' '[:lower:]'"
-		if lowerOriginal = lowerExclude then
-			   set shouldProcessAccount to false
-			   exit repeat
-		end if
-end repeat
+				set shouldProcessAccount to true
+				repeat with excludeItem in excludeAccounts
+						set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
+						set lowerExclude to do shell script "echo " & quoted form of excludeItem & " | tr '[:upper:]' '[:lower:]'"
+						if lowerOriginal = lowerExclude then
+								 set shouldProcessAccount to false
+								 exit repeat
+						end if
+				end repeat
 			end if
-			log "shouldProcessAccount: " & shouldProcessAccount
 			if shouldProcessAccount then
 				set end of filteredAccounts to anAccount
 			else
@@ -150,7 +147,7 @@ end repeat
 			set filteredFolders to {}
 			repeat with aFolder in theFolders
 				set originalFolderName to name of aFolder
-				set folderName to my makeValidFilename(originalFolderName)
+--				set folderName to my makeValidFilename(originalFolderName)
 				set shouldProcessFolder to false
 				if (count of includeFolders) > 0 then
 				    repeat with includeItem in includeFolders
@@ -481,6 +478,7 @@ end createDirectory
 -- Subroutine to write content to a file with UTF-8 encoding
 on writeToFile(filePath, content)
     log "[writeToFile: ]" & filePath
+
     try
         -- Create a temporary file for the content
         set tempFile to do shell script "mktemp"
@@ -516,7 +514,7 @@ end writeToFile
 
 -- Subroutine to generate a valid filename, replace certain characters with dashes, remove non-alphanumeric characters (except dashes), and consolidate multiple dashes
 on makeValidFilenameOld(filename)
-	log "[makeValidmakeValidFilenameOldFilename | original:] " & fileName
+	set originalFileName to filename
 	-- Replace only the genuinely problematic characters with dashes
 	set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
 	repeat with aChar in charactersToReplace
@@ -551,12 +549,12 @@ on makeValidFilenameOld(filename)
 		set filename to "untitled"
 	end if
 
-	log "[makeValidFilenameOld | updated:] " & fileName
+	log "[makeValidFilenameOld] original: [" & originalFileName & "] updated: [" & filename & "]"
 	return filename
 end makeValidFilenameOld
 
 on makeValidFilename(fileName)
-    log "[makeValidFilename | original:] " & fileName
+		set originalFileName to filename
     -- Replace only the genuinely problematic characters with dashes
     set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
     repeat with aChar in charactersToReplace
@@ -597,7 +595,7 @@ on makeValidFilename(fileName)
         set fileName to "untitled"
     end if
 
-		log "[makeValidFilename | updated:] " & fileName
+		log "[makeValidFilename] original: [" & originalFileName & "] updated: [" & filename & "]"
     return fileName
 end makeValidFilename
 
