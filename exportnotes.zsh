@@ -20,11 +20,28 @@ export NOTES_EXPORT_USE_SUBDIRS="${NOTES_EXPORT_USE_SUBDIRS:=true}"
 export NOTES_EXPORT_CONDA_ENV="${NOTES_EXPORT_CONDA_ENV:=}"
 export NOTES_EXPORT_REMOVE_CONDA_ENV="${NOTES_EXPORT_REMOVE_CONDA_ENV:=false}"
 export NOTES_EXPORT_UPDATE_ALL="${NOTES_EXPORT_UPDATE_ALL:=false}"  # NEW: Default to incremental updates
+export NOTES_EXPORT_EXCLUDE_ACCOUNTS="${NOTES_EXPORT_EXCLUDE_ACCOUNTS:=}"
+export NOTES_EXPORT_INCLUDE_ACCOUNTS="${NOTES_EXPORT_INCLUDE_ACCOUNTS:=}"
+export NOTES_EXPORT_EXCLUDE_FOLDERS="${NOTES_EXPORT_EXCLUDE_FOLDERS:=}"
+export NOTES_EXPORT_INCLUDE_FOLDERS="${NOTES_EXPORT_INCLUDE_FOLDERS:=}"
 
+echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
 # Force image extraction if either Markdown, PDF, or Word conversion is enabled
 if [[ "${NOTES_EXPORT_CONVERT_TO_MARKDOWN}" == "true" || "${NOTES_EXPORT_CONVERT_TO_PDF}" == "true" || "${NOTES_EXPORT_CONVERT_TO_WORD}" == "true" ]]; then
     export NOTES_EXPORT_EXTRACT_IMAGES=true
 fi
+
+# Initialize strings for collecting multiple filter options
+exclude_accounts=""
+include_accounts=""
+exclude_folders=""
+include_folders=""
+
+# Flags to track if CLI options were provided
+cli_exclude_accounts_set=false
+cli_include_accounts_set=false
+cli_exclude_folders_set=false
+cli_include_folders_set=false
 
 # Parse long and short command line options
 while [[ $# -gt 0 ]]; do
@@ -149,6 +166,58 @@ while [[ $# -gt 0 ]]; do
             export NOTES_EXPORT_REMOVE_CONDA_ENV="$2"
             shift 2
             ;;
+        --exclude-account)
+            if [[ -z "$2" ]]; then
+                echo "Error: --exclude-account requires an argument."
+                exit 1
+            fi
+            if [[ -n "$exclude_accounts" ]]; then
+                exclude_accounts="$exclude_accounts,$2"
+            else
+                exclude_accounts="$2"
+            fi
+            cli_exclude_accounts_set=true
+            shift 2
+            ;;
+        --include-account)
+            if [[ -z "$2" ]]; then
+                echo "Error: --include-account requires an argument."
+                exit 1
+            fi
+            if [[ -n "$include_accounts" ]]; then
+                include_accounts="$include_accounts,$2"
+            else
+                include_accounts="$2"
+            fi
+            cli_include_accounts_set=true
+            shift 2
+            ;;
+        --exclude-folder)
+            if [[ -z "$2" ]]; then
+                echo "Error: --exclude-folder requires an argument."
+                exit 1
+            fi
+            if [[ -n "$exclude_folders" ]]; then
+                exclude_folders="$exclude_folders,$2"
+            else
+                exclude_folders="$2"
+            fi
+            cli_exclude_folders_set=true
+            shift 2
+            ;;
+        --include-folder)
+            if [[ -z "$2" ]]; then
+                echo "Error: --include-folder requires an argument."
+                exit 1
+            fi
+            if [[ -n "$include_folders" ]]; then
+                include_folders="$include_folders,$2"
+            else
+                include_folders="$2"
+            fi
+            cli_include_folders_set=true
+            shift 2
+            ;;
         --update-all|-U)
             # NEW: Force full update of all notes (disable incremental updates)
             export NOTES_EXPORT_UPDATE_ALL="true"
@@ -182,12 +251,20 @@ while [[ $# -gt 0 ]]; do
             echo "  -x, --use-subdirs BOOL             Use subdirectories (default: true)"
             echo "  -c, --conda-env NAME               Conda environment name"
             echo "  -e, --remove-conda-env BOOL        Remove conda environment after export"
+            echo "  --exclude-account NAME             Exclude account by name (can be used multiple times)"
+            echo "  --include-account NAME             Include only account by name (can be used multiple times)"
+            echo "  --exclude-folder NAME              Exclude folder by name (can be used multiple times)"
+            echo "  --include-folder NAME              Include only folder by name (can be used multiple times)"
             echo "  -U, --update-all                   Force full update (disable incremental updates)"
             echo "  -a, --all-formats, --all           Enable all format conversions"
             echo "  -h, --help                         Show this help message"
             echo ""
             echo "Environment Variables:"
             echo "  NOTES_EXPORT_UPDATE_ALL            Set to 'true' to disable incremental updates (default: false)"
+            echo "  NOTES_EXPORT_EXCLUDE_ACCOUNTS      Comma-separated list of account names to exclude"
+            echo "  NOTES_EXPORT_INCLUDE_ACCOUNTS      Comma-separated list of account names to include only"
+            echo "  NOTES_EXPORT_EXCLUDE_FOLDERS       Comma-separated list of folder names to exclude"
+            echo "  NOTES_EXPORT_INCLUDE_FOLDERS       Comma-separated list of folder names to include only"
             echo ""
             echo "Update Modes:"
             echo "  Default (incremental): Only processes notes modified since last export"
@@ -201,6 +278,24 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
+
+# Set environment variables from collected strings (only if CLI options were provided)
+if $cli_exclude_accounts_set; then
+    export NOTES_EXPORT_EXCLUDE_ACCOUNTS="$exclude_accounts"
+fi
+if $cli_include_accounts_set; then
+    export NOTES_EXPORT_INCLUDE_ACCOUNTS="$include_accounts"
+fi
+if $cli_exclude_folders_set; then
+    export NOTES_EXPORT_EXCLUDE_FOLDERS="$exclude_folders"
+fi
+if $cli_include_folders_set; then
+    export NOTES_EXPORT_INCLUDE_FOLDERS="$include_folders"
+fi
+
+echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
 
 # Initialize Conda for Zsh
 eval "$(conda shell.zsh hook)"
@@ -257,19 +352,34 @@ fi
 # Conditionally execute the AppleScript for data extraction
 if [[ "${NOTES_EXPORT_EXTRACT_DATA}" == "true" ]]; then
     echo "Extracting note data..."
-    
+
     # Run AppleScript (simple, like the working version)
-    osascript "$SCRIPT_DIR/export_notes.scpt" "$NOTES_EXPORT_ROOT_DIR" "$NOTES_EXPORT_NOTE_LIMIT" "$NOTES_EXPORT_NOTE_LIMIT_PER_FOLDER" "$NOTES_EXPORT_NOTE_PICK_PROBABILITY" "$NOTES_EXPORT_FILENAME_FORMAT" "$NOTES_EXPORT_SUBDIR_FORMAT" "$NOTES_EXPORT_USE_SUBDIRS" "$NOTES_EXPORT_UPDATE_ALL"
-    
+    echo "EXECUTING... osascript":
+    echo "osascript $SCRIPT_DIR/export_notes.scpt \"$NOTES_EXPORT_ROOT_DIR\" \"$NOTES_EXPORT_NOTE_LIMIT\" \"$NOTES_EXPORT_NOTE_LIMIT_PER_FOLDER\" \"$NOTES_EXPORT_NOTE_PICK_PROBABILITY\" \"$NOTES_EXPORT_FILENAME_FORMAT\" \"$NOTES_EXPORT_SUBDIR_FORMAT\" \"$NOTES_EXPORT_USE_SUBDIRS\" \"$NOTES_EXPORT_UPDATE_ALL\" \"$NOTES_EXPORT_EXCLUDE_ACCOUNTS\" \"$NOTES_EXPORT_INCLUDE_ACCOUNTS\" \"$NOTES_EXPORT_EXCLUDE_FOLDERS\" \"$NOTES_EXPORT_INCLUDE_FOLDERS\""
+
+    osascript "$SCRIPT_DIR/export_notes.scpt" \
+                "$NOTES_EXPORT_ROOT_DIR" \
+                "$NOTES_EXPORT_NOTE_LIMIT" \
+                "$NOTES_EXPORT_NOTE_LIMIT_PER_FOLDER" \
+                "$NOTES_EXPORT_NOTE_PICK_PROBABILITY" \
+                "$NOTES_EXPORT_FILENAME_FORMAT" \
+                "$NOTES_EXPORT_SUBDIR_FORMAT" \
+                "$NOTES_EXPORT_USE_SUBDIRS" \
+                "$NOTES_EXPORT_UPDATE_ALL" \
+                "$NOTES_EXPORT_EXCLUDE_ACCOUNTS" \
+                "$NOTES_EXPORT_INCLUDE_ACCOUNTS" \
+                "$NOTES_EXPORT_EXCLUDE_FOLDERS" \
+                "$NOTES_EXPORT_INCLUDE_FOLDERS"
+
     # Read statistics from temporary file
     STATS_FILE="${NOTES_EXPORT_ROOT_DIR}/data/export_stats.tmp"
     echo "DEBUG: Looking for stats file at: $STATS_FILE"
-    
+
     if [[ -f "$STATS_FILE" ]]; then
         echo "DEBUG: Stats file found, reading contents..."
         STATS_CONTENT=$(cat "$STATS_FILE" | tr -d '\0\r' | head -1)  # Clean up any null bytes or carriage returns
         echo "DEBUG: Raw stats content: '$STATS_CONTENT'"
-        
+
         # Validate the content looks like numbers separated by colons (now with 6 fields including elapsed time)
         if [[ "$STATS_CONTENT" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9.]+$ ]]; then
             echo "DEBUG: Stats content matches expected format"
@@ -281,7 +391,7 @@ if [[ "${NOTES_EXPORT_EXTRACT_DATA}" == "true" ]]; then
             echo "Warning: Statistics file contains invalid data: '$STATS_CONTENT'"
             STATS_CAPTURED=false
         fi
-        
+
         # Clean up temp file
         rm -f "$STATS_FILE"
     else
@@ -344,7 +454,7 @@ if [[ "$STATS_CAPTURED" == "true" ]]; then
     echo "  Notes processed/updated: $PROCESSED_NOTES"
     echo "  Notes skipped (unchanged): $UNCHANGED_NOTES"
     echo "  Notes skipped (older): $OLDER_NOTES"
-    
+
     # Calculate and display percentages
     if [[ $TOTAL_NOTES -gt 0 ]]; then
         PROCESSED_PERCENT=$(( (PROCESSED_NOTES * 100) / TOTAL_NOTES ))
@@ -352,50 +462,50 @@ if [[ "$STATS_CAPTURED" == "true" ]]; then
         OLDER_PERCENT=$(( (OLDER_NOTES * 100) / TOTAL_NOTES ))
         echo "  Processing rate: ${PROCESSED_PERCENT}% processed, ${UNCHANGED_PERCENT}% unchanged, ${OLDER_PERCENT}% older"
     fi
-    
+
     echo ""
     echo "PERFORMANCE METRICS:"
-    
+
     # Overall rate (all notes examined)
     if [[ $ELAPSED_TIME -gt 0 && $TOTAL_NOTES -gt 0 ]]; then
         OVERALL_RATE=$(echo "scale=1; $TOTAL_NOTES / $ELAPSED_TIME" | bc -l)
         echo "  Overall examination rate: ${OVERALL_RATE} notes/second"
     fi
-    
+
     # Update rate (only processed notes)
     if [[ $ELAPSED_TIME -gt 0 && $PROCESSED_NOTES -gt 0 ]]; then
         UPDATE_RATE=$(echo "scale=1; $PROCESSED_NOTES / $ELAPSED_TIME" | bc -l)
         echo "  Update rate: ${UPDATE_RATE} notes/second"
-        
+
         # Time per updated note
         TIME_PER_UPDATE=$(echo "scale=2; $ELAPSED_TIME / $PROCESSED_NOTES" | bc -l)
         echo "  Time per update: ${TIME_PER_UPDATE} seconds/note"
     elif [[ $PROCESSED_NOTES -eq 0 ]]; then
         echo "  Update rate: N/A (no notes updated)"
     fi
-    
+
     # Skip rate (skipped notes)
     TOTAL_SKIPPED=$((UNCHANGED_NOTES + OLDER_NOTES))
     if [[ $ELAPSED_TIME -gt 0 && $TOTAL_SKIPPED -gt 0 ]]; then
         SKIP_RATE=$(echo "scale=1; $TOTAL_SKIPPED / $ELAPSED_TIME" | bc -l)
         echo "  Skip rate: ${SKIP_RATE} notes/second"
-        
+
         # Time per skipped note
         TIME_PER_SKIP=$(echo "scale=3; $ELAPSED_TIME / $TOTAL_SKIPPED" | bc -l)
         echo "  Time per skip: ${TIME_PER_SKIP} seconds/note"
     fi
-    
+
     # AppleScript vs Total time breakdown
     if [[ -n "$APPLESCRIPT_ELAPSED" ]] && [[ $(echo "$APPLESCRIPT_ELAPSED > 0" | bc -l) -eq 1 ]]; then
         APPLESCRIPT_PERCENT=$(echo "scale=1; ($APPLESCRIPT_ELAPSED * 100) / $ELAPSED_TIME" | bc -l)
         OTHER_TIME=$(echo "scale=1; $ELAPSED_TIME - $APPLESCRIPT_ELAPSED" | bc -l)
         OTHER_PERCENT=$(echo "scale=1; ($OTHER_TIME * 100) / $ELAPSED_TIME" | bc -l)
-        
+
         echo ""
         echo "TIME BREAKDOWN:"
         echo "  AppleScript processing: ${APPLESCRIPT_ELAPSED}s (${APPLESCRIPT_PERCENT}%)"
         echo "  Other operations: ${OTHER_TIME}s (${OTHER_PERCENT}%)"
-        
+
         # AppleScript-specific rates
         if [[ $(echo "$APPLESCRIPT_ELAPSED > 0" | bc -l) -eq 1 ]]; then
             AS_OVERALL_RATE=$(echo "scale=1; $TOTAL_NOTES / $APPLESCRIPT_ELAPSED" | bc -l)

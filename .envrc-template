@@ -1,0 +1,14 @@
+export NOTES_EXPORT_CONVERT_TO_MARKDOWN=true
+export NOTES_EXPORT_EXTRACT_DATA=true
+export NOTES_EXPORT_FILENAME_FORMAT="&title-&id"
+# export NOTES_EXPORT_ROOT_DIR=~/Library/Mobile\ Documents/com~apple~CloudDocs/markdown/notes-sync
+# export NOTES_EXPORT_ROOT_DIR=~/Documents/notes-exporter
+export NOTES_EXPORT_ROOT_DIR=~/Sites/_osx/notes-exporter--output/tmp
+export NOTES_EXPORT_CONDA_ENV=notes_env
+export NOTES_EXPORT_NOTE_LIMIT=4
+export NOTES_EXPORT_NOTE_LIMIT_PER_FOLDER=4
+export NOTES_EXPORT_UPDATE_ALL=false
+export NOTES_EXPORT_INCLUDE_ACCOUNTS=iCloud
+export NOTES_EXPORT_EXCLUDE_ACCOUNTS=""
+export NOTES_EXPORT_EXCLUDE_FOLDERS=""
+export NOTES_EXPORT_INCLUDE_FOLDERS="best bits,[atc]-Show Notes"

@@ -5,3 +5,8 @@ exportnotes_wrapper.zsh
 logs/*
 __pycache__
 tests/.pytest_cache/
+.envrc
+.idea
+*.iml
+.vscode
+tmp
