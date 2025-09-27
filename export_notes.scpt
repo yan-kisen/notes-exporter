@@ -288,12 +288,15 @@ on run argv
 								set htmlContent to body of theNote
 								set textContent to plaintext of theNote
 
+								set htmlContent to my fixHtmlEntities(htmlContent)
+
 								-- Generate file paths
 								set noteRawPath to POSIX path of (folderRawPath & noteName & ".html")
 								set noteTextPath to POSIX path of (folderTextPath & noteName & ".txt")
 
 								-- Save new files first
 								my writeToFile(noteRawPath, htmlContent)
+								log "##### HTML CONTENT ##### \n" & htmlContent
 								my writeToFile(noteTextPath, textContent)
 
 								-- Handle filename change (delete old files if filename changed)
@@ -1025,3 +1028,17 @@ on getSubdirFromPath(folderPath)
 	end if
 	return ""
 end getSubdirFromPath
+
+-- Subroutine to fix incomplete HTML entities (e.g., &quot to &quot;)
+on fixHtmlEntities(htmlContent)
+    -- Replace known incomplete entities with correct ones or decoded versions
+    set htmlContent to my replaceText("&quot", "&quot;", htmlContent)  -- Add semicolon
+    set htmlContent to my replaceText("&amp", "&amp;", htmlContent)    -- Add semicolon for ampersand if incomplete
+    set htmlContent to my replaceText("&lt", "&lt;", htmlContent)      -- Add semicolon for < if incomplete
+    set htmlContent to my replaceText("&gt", "&gt;", htmlContent)      -- Add semicolon for > if incomplete
+
+    -- Optionally decode to plain characters (e.g., &quot; to ")
+    -- set htmlContent to my replaceText("&quot;", "\"", htmlContent)
+
+    return htmlContent
+end fixHtmlEntities
