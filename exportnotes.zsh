@@ -25,7 +25,6 @@ export NOTES_EXPORT_INCLUDE_ACCOUNTS="${NOTES_EXPORT_INCLUDE_ACCOUNTS:=}"
 export NOTES_EXPORT_EXCLUDE_FOLDERS="${NOTES_EXPORT_EXCLUDE_FOLDERS:=}"
 export NOTES_EXPORT_INCLUDE_FOLDERS="${NOTES_EXPORT_INCLUDE_FOLDERS:=}"
 
-echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
 # Force image extraction if either Markdown, PDF, or Word conversion is enabled
 if [[ "${NOTES_EXPORT_CONVERT_TO_MARKDOWN}" == "true" || "${NOTES_EXPORT_CONVERT_TO_PDF}" == "true" || "${NOTES_EXPORT_CONVERT_TO_WORD}" == "true" ]]; then
     export NOTES_EXPORT_EXTRACT_IMAGES=true
@@ -279,8 +278,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
-
 # Set environment variables from collected strings (only if CLI options were provided)
 if $cli_exclude_accounts_set; then
     export NOTES_EXPORT_EXCLUDE_ACCOUNTS="$exclude_accounts"
@@ -294,8 +291,6 @@ fi
 if $cli_include_folders_set; then
     export NOTES_EXPORT_INCLUDE_FOLDERS="$include_folders"
 fi
-
-echo "NOTES_EXPORT_INCLUDE_ACCOUNTS: $NOTES_EXPORT_INCLUDE_ACCOUNTS"
 
 # Initialize Conda for Zsh
 eval "$(conda shell.zsh hook)"

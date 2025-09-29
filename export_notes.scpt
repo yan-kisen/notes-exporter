@@ -108,31 +108,28 @@ on run argv
 		set filteredAccounts to {}
 		repeat with anAccount in theAccounts
 			set originalAccountName to name of anAccount
-			set accountName to my makeValidFilename(originalAccountName)
+--			set accountName to my makeValidFilename(originalAccountName)
 			set shouldProcessAccount to false
 			if (count of includeAccounts) > 0 then
-repeat with includeItem in includeAccounts
-		log "comparing includeItem | [" & includeItem & "] vs [" & originalAccountName & "]"
-		set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
-		set lowerInclude to do shell script "echo " & quoted form of includeItem & " | tr '[:upper:]' '[:lower:]'"
-		if lowerOriginal = lowerInclude then
-			   log "setting shouldProcessAccount"
-			   set shouldProcessAccount to true
-			   exit repeat
-		end if
-end repeat
+				repeat with includeItem in includeAccounts
+						set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
+						set lowerInclude to do shell script "echo " & quoted form of includeItem & " | tr '[:upper:]' '[:lower:]'"
+						if lowerOriginal = lowerInclude then
+								 set shouldProcessAccount to true
+								 exit repeat
+						end if
+				end repeat
 			else
-set shouldProcessAccount to true
-repeat with excludeItem in excludeAccounts
-		set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
-		set lowerExclude to do shell script "echo " & quoted form of excludeItem & " | tr '[:upper:]' '[:lower:]'"
-		if lowerOriginal = lowerExclude then
-			   set shouldProcessAccount to false
-			   exit repeat
-		end if
-end repeat
+				set shouldProcessAccount to true
+				repeat with excludeItem in excludeAccounts
+						set lowerOriginal to do shell script "echo " & quoted form of originalAccountName & " | tr '[:upper:]' '[:lower:]'"
+						set lowerExclude to do shell script "echo " & quoted form of excludeItem & " | tr '[:upper:]' '[:lower:]'"
+						if lowerOriginal = lowerExclude then
+								 set shouldProcessAccount to false
+								 exit repeat
+						end if
+				end repeat
 			end if
-			log "shouldProcessAccount: " & shouldProcessAccount
 			if shouldProcessAccount then
 				set end of filteredAccounts to anAccount
 			else
@@ -150,7 +147,7 @@ end repeat
 			set filteredFolders to {}
 			repeat with aFolder in theFolders
 				set originalFolderName to name of aFolder
-				set folderName to my makeValidFilename(originalFolderName)
+--				set folderName to my makeValidFilename(originalFolderName)
 				set shouldProcessFolder to false
 				if (count of includeFolders) > 0 then
 				    repeat with includeItem in includeFolders
@@ -291,12 +288,15 @@ end repeat
 								set htmlContent to body of theNote
 								set textContent to plaintext of theNote
 
+								set htmlContent to my fixHtmlEntities(htmlContent)
+
 								-- Generate file paths
 								set noteRawPath to POSIX path of (folderRawPath & noteName & ".html")
 								set noteTextPath to POSIX path of (folderTextPath & noteName & ".txt")
 
 								-- Save new files first
 								my writeToFile(noteRawPath, htmlContent)
+								log "##### HTML CONTENT ##### \n" & htmlContent
 								my writeToFile(noteTextPath, textContent)
 
 								-- Handle filename change (delete old files if filename changed)
@@ -478,30 +478,46 @@ on createDirectory(directoryPath)
 	do shell script "mkdir -p " & quoted form of directoryPath
 end createDirectory
 
--- Subroutine to write content to a file
+-- Subroutine to write content to a file with UTF-8 encoding
 on writeToFile(filePath, content)
-	try
-		-- Convert the file path to a file object
-		set fileObject to POSIX file filePath
-		-- Try to open the file for access
-		set fileDescriptor to open for access fileObject with write permission
-		write content to fileDescriptor starting at eof
-		close access fileDescriptor
-	on error errMsg
-		-- Log the error message
-		log "Error writing to file: " & errMsg
+    log "[writeToFile: ]" & filePath
 
-		-- If the file does not exist, create it and then open for access
-		close access
-		do shell script "touch " & quoted form of filePath
-		set fileDescriptor to open for access fileObject with write permission
-		write content to fileDescriptor starting at eof
-		close access fileDescriptor
-	end try
+    try
+        -- Create a temporary file for the content
+        set tempFile to do shell script "mktemp"
+        -- Write content to temp file using a here document with unique delimiter
+        set delimiter to "UNIQUE_DELIMITER_" & (random number from 100000 to 999999)
+        do shell script "cat > " & quoted form of tempFile & " << '" & delimiter & "'
+" & content & "
+" & delimiter
+        -- Use Python to read from temp file and write to final file with UTF-8 encoding
+        set pythonCommand to "python3 -c \"
+import sys
+tempFile = sys.argv[1]
+filePath = sys.argv[2]
+with open(tempFile, 'r', encoding='utf-8') as f:
+    content = f.read()
+with open(filePath, 'w', encoding='utf-8') as f:
+    f.write(content)
+\" " & quoted form of tempFile & " " & quoted form of filePath
+        do shell script pythonCommand
+        -- Clean up temp file
+        do shell script "rm " & quoted form of tempFile
+    on error errMsg
+        -- Log the error message
+        log "Error writing to file: " & errMsg
+        -- Try to clean up temp file if it exists
+        try
+            do shell script "rm -f " & quoted form of tempFile
+        end try
+        -- Fallback: create empty file
+        do shell script "touch " & quoted form of filePath
+    end try
 end writeToFile
 
 -- Subroutine to generate a valid filename, replace certain characters with dashes, remove non-alphanumeric characters (except dashes), and consolidate multiple dashes
-on makeValidFilename(filename)
+on makeValidFilenameOld(filename)
+	set originalFileName to filename
 	-- Replace only the genuinely problematic characters with dashes
 	set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
 	repeat with aChar in charactersToReplace
@@ -528,12 +544,62 @@ on makeValidFilename(filename)
 		set filename to text 1 through -2 of filename
 	end repeat
 
+	-- Remove emojis and other non-ASCII characters for Obsidian compatibility
+	set filename to do shell script "echo " & quoted form of filename & " | iconv -c -t ascii 2>/dev/null"
+
 	-- Ensure filename isn't empty
 	if filename is "" or filename is "-" then
 		set filename to "untitled"
 	end if
 
+	log "[makeValidFilenameOld] original: [" & originalFileName & "] updated: [" & filename & "]"
 	return filename
+end makeValidFilenameOld
+
+on makeValidFilename(fileName)
+		set originalFileName to filename
+    -- Replace only the genuinely problematic characters with dashes
+    set charactersToReplace to {"/", ":", "\\", "|", "<", ">", "\"", "'", "?", "*", "_", " ", ".", ",", tab}
+    repeat with aChar in charactersToReplace
+        set AppleScript's text item delimiters to aChar
+        set fileName to text items of fileName
+        set AppleScript's text item delimiters to "-"
+        set fileName to fileName as string
+    end repeat
+
+    -- NEW: Remove non-ASCII characters (including emojis)
+    try
+        set pythonCommand to "python3 -c \"import sys; import re; print(re.sub(r'[^\\x00-\\x7F]', '', sys.argv[1]))\" " & quoted form of fileName
+        set fileName to do shell script pythonCommand
+    on error errMsg
+        log "Error removing non-ASCII characters: " & errMsg
+        -- Fallback: Keep original sanitization if Python fails
+    end try
+
+    -- Consolidate multiple dashes
+    repeat while fileName contains "--"
+        set AppleScript's text item delimiters to "--"
+        set textItems to text items of fileName
+        set AppleScript's text item delimiters to "-"
+        set fileName to textItems as string
+    end repeat
+
+    -- Remove leading/trailing dashes
+    repeat while fileName starts with "-" and length of fileName > 1
+        set fileName to text 2 through -1 of fileName
+    end repeat
+
+    repeat while fileName ends with "-" and length of fileName > 1
+        set fileName to text 1 through -2 of fileName
+    end repeat
+
+    -- Ensure filename isn't empty
+    if fileName is "" or fileName is "-" then
+        set fileName to "untitled"
+    end if
+
+		log "[makeValidFilename] original: [" & originalFileName & "] updated: [" & filename & "]"
+    return fileName
 end makeValidFilename
 
 -- Subroutine to generate a filename based on the specified format
@@ -962,3 +1028,17 @@ on getSubdirFromPath(folderPath)
 	end if
 	return ""
 end getSubdirFromPath
+
+-- Subroutine to fix incomplete HTML entities (e.g., &quot to &quot;)
+on fixHtmlEntities(htmlContent)
+    -- Replace known incomplete entities with correct ones or decoded versions
+    set htmlContent to my replaceText("&quot", "&quot;", htmlContent)  -- Add semicolon
+    set htmlContent to my replaceText("&amp", "&amp;", htmlContent)    -- Add semicolon for ampersand if incomplete
+    set htmlContent to my replaceText("&lt", "&lt;", htmlContent)      -- Add semicolon for < if incomplete
+    set htmlContent to my replaceText("&gt", "&gt;", htmlContent)      -- Add semicolon for > if incomplete
+
+    -- Optionally decode to plain characters (e.g., &quot; to ")
+    -- set htmlContent to my replaceText("&quot;", "\"", htmlContent)
+
+    return htmlContent
+end fixHtmlEntities
