@@ -1,0 +1,6 @@
+beautifulsoup4
+# markdownify==1.1.0
+html-to-markdown==1.16.0  # Replace markdownify
+lxml
+pypandoc==1.15
+pytest

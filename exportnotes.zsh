@@ -41,6 +41,7 @@ cli_exclude_accounts_set=false
 cli_include_accounts_set=false
 cli_exclude_folders_set=false
 cli_include_folders_set=false
+force_markdown=false
 
 # Parse long and short command line options
 while [[ $# -gt 0 ]]; do
@@ -229,6 +230,10 @@ while [[ $# -gt 0 ]]; do
             export NOTES_EXPORT_EXTRACT_IMAGES="true"
             shift
             ;;
+        --force-markdown)
+          force_markdown=true
+          shift
+          ;;
         --help|-h)
             echo "Apple Notes Exporter"
             echo ""
@@ -305,7 +310,8 @@ create_conda_env() {
     conda create -y -n "$1" python=3.9
     eval "$(conda shell.zsh hook)" # Ensure conda is reinitialized
     conda activate "$1"
-    pip install -r "$SCRIPT_DIR/requirements.txt"
+#    pip install -r "$SCRIPT_DIR/requirements.txt"
+    pip install -r "$SCRIPT_DIR/requirements-2.txt"
 }
 
 # Function to deactivate a conda environment
@@ -345,7 +351,7 @@ else
 fi
 
 # Conditionally execute the AppleScript for data extraction
-if [[ "${NOTES_EXPORT_EXTRACT_DATA}" == "true" ]]; then
+if [[ "${NOTES_EXPORT_EXTRACT_DATA}" == "true" && "${force_markdown}" != "true"  ]]; then
     echo "Extracting note data..."
 
     # Run AppleScript (simple, like the working version)
@@ -404,7 +410,11 @@ fi
 # Conditionally execute the conversion scripts
 if [[ "${NOTES_EXPORT_CONVERT_TO_MARKDOWN}" == "true" ]]; then
     echo "Converting to Markdown..."
-    python "$SCRIPT_DIR/convert_to_markdown.py"
+     if [[ "${force_markdown}" == "true" ]]; then
+        python "${SCRIPT_DIR}/convert_to_markdown_2.py" --force
+    else
+        python "${SCRIPT_DIR}/convert_to_markdown_2.py"
+    fi
 fi
 
 if [[ "${NOTES_EXPORT_CONVERT_TO_PDF}" == "true" ]]; then
